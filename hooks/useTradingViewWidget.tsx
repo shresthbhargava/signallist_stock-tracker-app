@@ -1,30 +1,52 @@
 'use client';
-import { useEffect, useRef }     from "react";
+import { useEffect, useRef } from 'react';
 
 const useTradingViewWidget = (scriptUrl: string, config: Record<string, unknown>, height = 600) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        if (!containerRef.current) return;
-        if (containerRef.current.dataset.loaded) return;
-        containerRef.current.innerHTML = `<div class="tradingview-widget-container__widget" style="width: 100%; height: ${height}px;"></div>`;
+        const container = containerRef.current;
+        if (!container) return;
 
-        const script = document.createElement("script");
+        // Skip if already loaded
+        if (container.dataset.loaded) return;
+
+        const script = document.createElement('script');
         script.src = scriptUrl;
         script.async = true;
-        script.innerHTML = JSON.stringify(config);
-
-        containerRef.current.appendChild(script);
-        containerRef.current.dataset.loaded = 'true';
-
-        return () => {
-            if(containerRef.current) {
-                containerRef.current.innerHTML = '';
-                delete containerRef.current.dataset.loaded;
+        script.onload = () => {
+            if (window.TradingView) {
+                new window.TradingView.Widget({
+                    container,
+                    ...config,
+                    height,
+                    width: '100%',
+                });
+                container.dataset.loaded = 'true';
+            } else {
+                console.error('TradingView library not loaded');
             }
-        }
-    }, [scriptUrl, config, height])
+        };
+
+        document.body.appendChild(script);
+
+        // Cleanup
+        return () => {
+            if (container) {
+                container.innerHTML = ''; // Clear widget content
+                delete container.dataset.loaded;
+            }
+            const scripts = document.getElementsByTagName('script');
+            for (let i = scripts.length - 1; i >= 0; i--) {
+                if (scripts[i].src === scriptUrl) {
+                    document.body.removeChild(scripts[i]);
+                    break;
+                }
+            }
+        };
+    }, [scriptUrl, config, height]);
 
     return containerRef;
-}
-export default useTradingViewWidget
+};
+
+export default useTradingViewWidget;
